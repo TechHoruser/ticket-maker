@@ -64,7 +64,7 @@ async function printerRoutes(fastify, options) {
                                 type: { type: 'string', enum: ['text', 'products', 'table', 'barcode', 'qrcode', 'image', 'space'] },
                                 value: { type: 'string' }, // For text, qrcode
                                 text: { type: 'string' }, // Alternative for text
-                                align: { type: 'string', enum: ['lt', 'ct', 'rt'] },
+                                align: { type: 'string', enum: ['lt', 'ct', 'rt', 'left', 'center', 'right'] },
                                 style: { type: 'string' }, // 'bu', 'b', 'u', 'Normal', etc.
                                 size: { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 },
                                 items: {
