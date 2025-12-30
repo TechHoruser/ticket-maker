@@ -1,5 +1,7 @@
 const { ThermalPrinter, PrinterTypes } = require('node-thermal-printer');
 const net = require('net');
+const { codePages: xprinterCodePages } = require('./xprinter-80t.conf');
+const PrintQueue = require('./printQueue');
 
 const TARGET_IP = process.env.PRINTER_IP;
 const TARGET_PORT = process.env.PRINTER_PORT;
@@ -17,7 +19,8 @@ const PRINTER_CONFIG = {
 
 class PrinterService {
     constructor() {
-        // No config argument needed anymore
+        // Queue with 500ms cool down to be safe with Xthermal
+        this.printQueue = new PrintQueue(500);
     }
 
     async printTicket(sections = []) {
@@ -26,9 +29,18 @@ class PrinterService {
 
         // --- FIX PARA XPRINTER 80T ---
         // 1. Cancelar modo caracteres chinos (FS .) -> 0x1C, 0x2E
-        // 2. Forzar Code Page 19 (PC858) -> 0x1B, 0x74, 19
+        // 2. Set Code Page
         printer.raw(Buffer.from([0x1C, 0x2E]));
-        printer.raw(Buffer.from([0x1B, 0x74, 19]));
+
+        const codePageKey = PRINTER_CONFIG.characterSet;
+        const codePageVal = xprinterCodePages[codePageKey];
+
+        if (codePageVal !== undefined) {
+            console.log(`Setting Code Page to ${codePageKey} (${codePageVal})`);
+            printer.raw(Buffer.from([0x1B, 0x74, codePageVal]));
+        } else {
+            console.warn(`Code Page ${codePageKey} not found in xprinter config`);
+        }
         // -----------------------------
 
         try {
@@ -78,6 +90,11 @@ class PrinterService {
     }
 
     async _sendToPrinter(ip, port, buffer) {
+        // Wrap the socket logic in a task passed to the queue
+        return this.printQueue.add(() => this._executeSendRaw(ip, port, buffer));
+    }
+
+    async _executeSendRaw(ip, port, buffer) {
         return new Promise((resolve, reject) => {
             const socket = new net.Socket();
             let success = false;
@@ -85,14 +102,20 @@ class PrinterService {
             socket.setTimeout(5000);
 
             socket.on('connect', () => {
-                socket.write(buffer, () => {
-                    success = true;
-                    socket.end(); // Close connection after sending
-                });
+                // Keep the small write delay just in case, but Queue is the main guard
+                setTimeout(() => {
+                    socket.write(buffer, (err) => {
+                        if (err) {
+                            // Error handling mostly via event emitter
+                        }
+                        success = true;
+                        socket.end();
+                    });
+                }, 100);
             });
 
             socket.on('data', (data) => {
-                // Some printers respond, others don't.
+                // Some printers respond
             });
 
             socket.on('timeout', () => {
@@ -108,8 +131,9 @@ class PrinterService {
                 if (success) {
                     resolve({ success: true, message: 'Printed successfully' });
                 } else {
-                    // If closed without success and no previous error (rare if not timeout/error)
-                    // Could consider reject if nothing was written
+                    // Try to resolve/reject cleanly
+                    // If we haven't resolved yet (no success), it's a failure
+                    // reject(new Error('Connection closed without success')); // Optional strict check
                 }
             });
 
