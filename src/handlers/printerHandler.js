@@ -1,7 +1,7 @@
-const config = require('../config');
+
 const PrinterService = require('../services/printer/printerService');
 
-const printerService = new PrinterService(config.printer);
+const printerService = new PrinterService();
 
 async function printQr(request, reply) {
     const { url } = request.body;
@@ -21,10 +21,10 @@ async function printQr(request, reply) {
 }
 
 async function printTicket(request, reply) {
-    const { config = {}, sections = [] } = request.body;
+    const { sections = [] } = request.body;
 
     try {
-        const result = await printerService.printTicket(config, sections);
+        const result = await printerService.printTicket(sections);
         return result;
     } catch (err) {
         request.log.error(err);

@@ -45,23 +45,91 @@ async function printerRoutes(fastify, options) {
                 type: 'object',
                 required: ['sections'],
                 properties: {
-                    config: {
-                        type: 'object',
-                        description: 'Printer configuration overrides',
-                        properties: {
-                            ip: { type: 'string' },
-                            port: { type: 'integer' },
-                            encoding: { type: 'string' },
-                            font: { type: 'string', enum: ['a', 'b'] }
-                        }
-                    },
                     sections: {
                         type: 'array',
+                        default: [
+                            {
+                                "type": "text",
+                                "value": "MI TIENDA GENIAL",
+                                "align": "center",
+                                "style": "b",
+                                "size": [2, 2]
+                            },
+                            {
+                                "type": "text",
+                                "value": "C/ Ejemplo 123, Madrid\nTel: 91 123 45 67",
+                                "align": "center"
+                            },
+                            {
+                                "type": "space",
+                                "lines": 1
+                            },
+                            {
+                                "type": "text",
+                                "value": "Ticket: #00012345\nFecha: 30/12/2025 22:30",
+                                "align": "left"
+                            },
+                            {
+                                "type": "line"
+                            },
+                            {
+                                "type": "products",
+                                "rows": [
+                                    {
+                                        "count": 2,
+                                        "description": "Coca Cola Zero 33cl",
+                                        "amount": 3.00
+                                    },
+                                    {
+                                        "count": 1,
+                                        "description": "Bocadillo Jamón Serr.",
+                                        "amount": 5.50
+                                    },
+                                    {
+                                        "count": 3,
+                                        "description": "Agua Mineral 50cl",
+                                        "amount": 4.50
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "line"
+                            },
+                            {
+                                "type": "table",
+                                "rows": [
+                                    ["Subtotal", "13.00€"],
+                                    ["IVA (21%)", "2.73€"],
+                                    ["TOTAL", "15.73€"]
+                                ]
+                            },
+                            {
+                                "type": "space",
+                                "lines": 2
+                            },
+                            {
+                                "type": "text",
+                                "value": "¡Gracias por su visita!\nConserve este ticket para devoluciones",
+                                "align": "center",
+                                "style": "b"
+                            },
+                            {
+                                "type": "space",
+                                "lines": 1
+                            },
+                            {
+                                "type": "barcode",
+                                "code": "1234567890128",
+                                "barcodeType": "EAN13",
+                                "width": 2,
+                                "height": 50
+                            }
+                        ],
                         items: {
                             type: 'object',
                             required: ['type'],
                             properties: {
-                                type: { type: 'string', enum: ['text', 'products', 'table', 'barcode', 'qrcode', 'image', 'space'] },
+                                type: { type: 'string', enum: ['text', 'products', 'table', 'barcode', 'qrcode', 'image', 'space', 'line'] },
                                 value: { type: 'string' }, // For text, qrcode
                                 text: { type: 'string' }, // Alternative for text
                                 align: { type: 'string', enum: ['lt', 'ct', 'rt', 'left', 'center', 'right'] },
