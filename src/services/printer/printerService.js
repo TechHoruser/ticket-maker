@@ -24,6 +24,13 @@ class PrinterService {
         // Initialize printer (buffer generator)
         const printer = new ThermalPrinter(PRINTER_CONFIG);
 
+        // --- FIX PARA XPRINTER 80T ---
+        // 1. Cancelar modo caracteres chinos (FS .) -> 0x1C, 0x2E
+        // 2. Forzar Code Page 19 (PC858) -> 0x1B, 0x74, 19
+        printer.raw(Buffer.from([0x1C, 0x2E]));
+        printer.raw(Buffer.from([0x1B, 0x74, 19]));
+        // -----------------------------
+
         try {
             printer.alignLeft();
             printer.setTextNormal();
