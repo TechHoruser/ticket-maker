@@ -10,7 +10,6 @@ async function swaggerPlugin(fastify, options) {
                 description: 'API for printing QR tickets',
                 version: '1.0.0'
             },
-            host: 'localhost:3000',
             schemes: ['http'],
             consumes: ['application/json'],
             produces: ['application/json']
@@ -23,7 +22,7 @@ async function swaggerPlugin(fastify, options) {
             docExpansion: 'full',
             deepLinking: false
         },
-        staticCSP: true,
+        staticCSP: false,
         transformStaticCSP: (header) => header
     });
 }
