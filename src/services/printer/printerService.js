@@ -67,27 +67,7 @@ class PrinterService {
         }
     }
 
-    async printQr(url) {
-        // Initialize printer
-        const printer = new ThermalPrinter(PRINTER_CONFIG);
 
-        try {
-            printer.alignCenter();
-            printer.printQR(url, {
-                cellSize: 6,
-                correction: 'M',
-                model: 2
-            });
-            printer.cut();
-            printer.beep();
-
-            const buffer = printer.getBuffer();
-            return await this._sendToPrinter(TARGET_IP, TARGET_PORT, buffer);
-        } catch (err) {
-            console.error('Error printing QR:', err);
-            throw err;
-        }
-    }
 
     async _sendToPrinter(ip, port, buffer) {
         // Wrap the socket logic in a task passed to the queue

@@ -1,41 +1,7 @@
 const printerHandler = require('../handlers/printerHandler');
 
 async function printerRoutes(fastify, options) {
-    fastify.post('/print-qr', {
-        schema: {
-            description: 'Generate and print a QR code for a given URL',
-            tags: ['printer'],
-            body: {
-                type: 'object',
-                required: ['url'],
-                properties: {
-                    url: { type: 'string', description: 'The URL to encode in the QR code' }
-                }
-            },
-            response: {
-                200: {
-                    type: 'object',
-                    properties: {
-                        success: { type: 'boolean' },
-                        message: { type: 'string' }
-                    }
-                },
-                400: {
-                    type: 'object',
-                    properties: {
-                        error: { type: 'string' }
-                    }
-                },
-                500: {
-                    type: 'object',
-                    properties: {
-                        error: { type: 'string' },
-                        details: { type: 'string' }
-                    }
-                }
-            }
-        }
-    }, printerHandler.printQr);
+
 
     fastify.post('/print-ticket', {
         schema: {
