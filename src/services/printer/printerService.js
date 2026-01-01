@@ -156,8 +156,8 @@ class PrinterService {
                         const amountStr = amountVal.toFixed(2) + '€';
 
                         printer.tableCustom([
-                            { text: description, align: "LEFT", width: 0.70 },
-                            { text: amountStr, align: "RIGHT", width: 0.30 }
+                            { text: description, align: "LEFT", width: 0.75 },
+                            { text: amountStr, align: "RIGHT", width: 0.25 }
                         ]);
                     });
                 }
@@ -168,8 +168,8 @@ class PrinterService {
                     section.rows.forEach(row => {
                         if (Array.isArray(row) && row.length === 2) {
                             printer.tableCustom([
-                                { text: row[0], align: "LEFT" },
-                                { text: row[1], align: "RIGHT" }
+                                { text: row[0], align: "LEFT", width: 0.75 },
+                                { text: row[1], align: "RIGHT", width: 0.25 }
                             ]);
                         }
                     });

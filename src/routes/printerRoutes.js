@@ -106,7 +106,7 @@ async function printerRoutes(fastify, options) {
                                     items: {
                                         type: 'object',
                                         properties: {
-                                            qty: { type: ['integer', 'string'] },
+                                            qty: { oneOf: [{ type: 'integer' }, { type: 'string' }] },
                                             desc: { type: 'string' },
                                             total: { type: 'string' }
                                         }
