@@ -1,7 +1,6 @@
 const { ThermalPrinter, PrinterTypes } = require('node-thermal-printer');
 const net = require('net');
 const { codePages: xprinterCodePages } = require('./xprinter-80t.conf');
-const PrintQueue = require('./printQueue');
 
 const TARGET_IP = process.env.PRINTER_IP;
 const TARGET_PORT = process.env.PRINTER_PORT;
@@ -19,8 +18,6 @@ const PRINTER_CONFIG = {
 
 class PrinterService {
     constructor() {
-        // Queue with 500ms cool down to be safe with Xthermal
-        this.printQueue = new PrintQueue(500);
     }
 
     async printTicket(sections = []) {
@@ -70,32 +67,46 @@ class PrinterService {
 
 
     async _sendToPrinter(ip, port, buffer) {
-        // Wrap the socket logic in a task passed to the queue
-        return this.printQueue.add(() => this._executeSendRaw(ip, port, buffer));
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY = 1000;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                if (attempt > 1) {
+                    console.log(`Retry attempt ${attempt}/${MAX_RETRIES} for printer connection...`);
+                }
+                return await this._executeSendRaw(ip, port, buffer);
+            } catch (err) {
+                console.warn(`Printer connection failed (attempt ${attempt}/${MAX_RETRIES}): ${err.message}`);
+
+                const isConnectionError = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'EHOSTUNREACH'].includes(err.code) ||
+                    (err.message && err.message.includes('ECONNRESET'));
+
+                if (!isConnectionError || attempt === MAX_RETRIES) {
+                    throw err;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            }
+        }
     }
 
     async _executeSendRaw(ip, port, buffer) {
         return new Promise((resolve, reject) => {
             const socket = new net.Socket();
-            let success = false;
 
+            // Handle timeout
             socket.setTimeout(5000);
 
             socket.on('connect', () => {
-                // Keep the small write delay just in case, but Queue is the main guard
-                setTimeout(() => {
-                    socket.write(buffer, (err) => {
-                        if (err) {
-                            // Error handling mostly via event emitter
-                        }
-                        success = true;
-                        socket.end();
-                    });
-                }, 100);
-            });
-
-            socket.on('data', (data) => {
-                // Some printers respond
+                socket.write(buffer, (err) => {
+                    if (err) {
+                        socket.destroy();
+                        reject(err);
+                    } else {
+                        socket.end(); // Send FIN packet to close connection gracefully
+                    }
+                });
             });
 
             socket.on('timeout', () => {
@@ -104,17 +115,16 @@ class PrinterService {
             });
 
             socket.on('error', (err) => {
+                socket.destroy();
                 reject(err);
             });
 
-            socket.on('close', () => {
-                if (success) {
+            socket.on('close', (hadError) => {
+                // If it closed without error (or we handled the error), resolve
+                if (!hadError) {
                     resolve({ success: true, message: 'Printed successfully' });
-                } else {
-                    // Try to resolve/reject cleanly
-                    // If we haven't resolved yet (no success), it's a failure
-                    // reject(new Error('Connection closed without success')); // Optional strict check
                 }
+                // If hadError is true, 'error' event should have triggered reject
             });
 
             socket.connect(port, ip);
