@@ -1,5 +1,6 @@
 const { ThermalPrinter, PrinterTypes } = require('node-thermal-printer');
 const net = require('net');
+const { PNG } = require('pngjs');
 const { codePages: xprinterCodePages } = require('./xprinter-80t.conf');
 
 const TARGET_IP = process.env.PRINTER_IP;
@@ -131,6 +132,43 @@ class PrinterService {
         });
     }
 
+    async _processImagePosition(imageBuffer, position) {
+        const PRINTER_WIDTH_DOTS = 576; // Standard 80mm width
+        const cols = position.cols || 1;
+        const startCol = position.startCol || 0;
+        const endCol = position.endCol || 1;
+
+        const colWidth = PRINTER_WIDTH_DOTS / cols;
+        const spanWidth = (endCol - startCol) * colWidth;
+
+        // Resize image to fit in the column span if necessary
+        const resizedBuffer = await this._resizePng(imageBuffer, spanWidth);
+
+        return new Promise((resolve, reject) => {
+            new PNG().parse(resizedBuffer, (error, data) => {
+                if (error) return reject(error);
+
+                try {
+                    const startX = startCol * colWidth;
+                    const centerX = startX + (spanWidth / 2);
+
+                    let targetX = Math.round(centerX - (data.width / 2));
+                    if (targetX < 0) targetX = 0;
+
+                    const newPng = new PNG({ width: PRINTER_WIDTH_DOTS, height: data.height });
+
+                    // data.bitblt(dst, srcX, srcY, width, height, dstX, dstY)
+                    data.bitblt(newPng, 0, 0, data.width, data.height, targetX, 0);
+
+                    const buffer = PNG.sync.write(newPng);
+                    resolve(buffer);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        });
+    }
+
     async _printSection(printer, section) {
         if (!section.type) return;
 
@@ -227,7 +265,79 @@ class PrinterService {
                     printer.alignLeft();
                 }
                 break;
+
+            case 'image':
+                if (section.image) {
+                    try {
+                        let base64Image = section.image;
+                        const base64Prefix = /^data:image\/[a-z]+;base64,/;
+                        if (base64Prefix.test(base64Image)) {
+                            base64Image = base64Image.replace(base64Prefix, '');
+                        }
+
+                        let imageBuffer = Buffer.from(base64Image, 'base64');
+
+                        if (section.position) {
+                            // Logic inside _processImagePosition handles resizing to valid column span
+                            const processedBuffer = await this._processImagePosition(imageBuffer, section.position);
+                            printer.alignLeft();
+                            await printer.printImageBuffer(processedBuffer);
+                        } else {
+                            // Standard full width fit
+                            imageBuffer = await this._fitImageToPrinter(imageBuffer);
+                            printer.alignCenter();
+                            await printer.printImageBuffer(imageBuffer);
+                            printer.alignLeft();
+                        }
+                    } catch (err) {
+                        console.error('Error printing image:', err);
+                    }
+                }
+                break;
         }
+    }
+
+    async _fitImageToPrinter(imageBuffer) {
+        return this._resizePng(imageBuffer, 576);
+    }
+
+    async _resizePng(imageBuffer, maxWidth) {
+        return new Promise((resolve, reject) => {
+            const png = new PNG({ filterType: 4 });
+            png.parse(imageBuffer, (error, data) => {
+                if (error) return reject(error);
+
+                if (data.width <= maxWidth) {
+                    resolve(imageBuffer);
+                    return;
+                }
+
+                // Simple Downscaling (Nearest Neighbor)
+                const scale = maxWidth / data.width;
+                const newWidth = Math.floor(maxWidth); // Ensure integer
+                const newHeight = Math.round(data.height * scale);
+
+                const dst = new PNG({ width: newWidth, height: newHeight });
+
+                for (let y = 0; y < newHeight; y++) {
+                    for (let x = 0; x < newWidth; x++) {
+                        const srcX = Math.floor(x / scale);
+                        const srcY = Math.floor(y / scale);
+
+                        const srcIdx = (data.width * srcY + srcX) << 2;
+                        const dstIdx = (newWidth * y + x) << 2;
+
+                        dst.data[dstIdx] = data.data[srcIdx];
+                        dst.data[dstIdx + 1] = data.data[srcIdx + 1];
+                        dst.data[dstIdx + 2] = data.data[srcIdx + 2];
+                        dst.data[dstIdx + 3] = data.data[srcIdx + 3];
+                    }
+                }
+
+                const buffer = PNG.sync.write(dst);
+                resolve(buffer);
+            });
+        });
     }
 }
 

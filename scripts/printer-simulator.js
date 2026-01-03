@@ -69,6 +69,55 @@ const server = net.createServer((socket) => {
                         }
                     } else if (cmd === 0x21) { // GS ! n (Char size)
                         i += 3;
+                    } else if (cmd === 0x76) { // GS v 0 m xL xH yL yH d1...dk (Raster bit image)
+                        if (i + 7 < buffer.length && buffer[i + 2] === 0x30) {
+                            const xL = buffer[i + 4];
+                            const xH = buffer[i + 5];
+                            const yL = buffer[i + 6];
+                            const yH = buffer[i + 7];
+
+                            const bytesX = xL + xH * 256;
+                            const dotsY = yL + yH * 256;
+                            const k = bytesX * dotsY;
+
+                            // Calculate ASCII dimensions
+                            const widthPx = bytesX * 8;
+                            const asciiWidth = Math.min(TICKET_WIDTH, Math.max(14, Math.ceil(widthPx / 12)));
+                            const asciiHeight = Math.max(3, Math.ceil(dotsY / 24));
+                            const label = `${widthPx}x${dotsY}`;
+
+                            const padLeft = Math.max(0, Math.floor((TICKET_WIDTH - asciiWidth) / 2));
+                            const padding = ' '.repeat(padLeft);
+                            const border = padding + '+' + '-'.repeat(asciiWidth - 2) + '+';
+
+                            // Generate box lines
+                            let asciiArt = '\n' + border + '\n';
+
+                            const labelPadTotal = Math.max(0, asciiWidth - 2 - label.length);
+                            const labelPadL = Math.floor(labelPadTotal / 2);
+                            const labelPadR = labelPadTotal - labelPadL;
+                            const labelRow = padding + '|' + ' '.repeat(labelPadL) + label + ' '.repeat(labelPadR) + '|';
+                            const emptyRow = padding + '|' + ' '.repeat(asciiWidth - 2) + '|';
+
+                            for (let h = 0; h < asciiHeight - 2; h++) {
+                                if (h === Math.floor((asciiHeight - 2) / 2)) {
+                                    asciiArt += labelRow + '\n';
+                                } else {
+                                    asciiArt += emptyRow + '\n';
+                                }
+                            }
+                            asciiArt += border + '\n';
+
+                            // Push ASCII art to result
+                            for (let c = 0; c < asciiArt.length; c++) {
+                                result.push(asciiArt.charCodeAt(c));
+                            }
+
+                            i += 8 + k;
+                        } else {
+                            // Incomplete or unknown GS v, skip safe amount
+                            i += 3;
+                        }
                     } else {
                         i += 2;
                     }

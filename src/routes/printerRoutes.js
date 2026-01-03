@@ -138,6 +138,16 @@ async function printerRoutes(fastify, options) {
                                 width: { type: 'integer' },
                                 height: { type: 'integer' },
                                 path: { type: 'string' }, // For image
+                                image: { type: 'string' }, // base64 string
+                                position: {
+                                    type: 'object',
+                                    required: ['cols', 'startCol', 'endCol'],
+                                    properties: {
+                                        cols: { type: 'integer' },
+                                        startCol: { type: 'integer' },
+                                        endCol: { type: 'integer' }
+                                    }
+                                },
                                 lines: { type: 'integer' } // For space
                             }
                         }
